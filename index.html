@@ -242,17 +242,28 @@ function triggerDash() {
     if(Date.now() - lastDash > 500) { 
         isDashing = true; dashTime = 0.15; lastDash = Date.now();
         let dx = 0, dz = 0;
-        if(isMobile) {
-            if(joyMove.x === 0 && joyMove.y === 0) { dx = Math.cos(camYaw); dz = Math.sin(camYaw); }
-            else { dx = Math.cos(camYaw)*-joyMove.y + Math.cos(camYaw+Math.PI/2)*joyMove.x; dz = Math.sin(camYaw)*-joyMove.y + Math.sin(camYaw+Math.PI/2)*joyMove.x; }
-        } else {
-            if(keys['KeyW']) { dx += Math.cos(camYaw); dz += Math.sin(camYaw); }
-            if(keys['KeyS']) { dx -= Math.cos(camYaw); dz -= Math.sin(camYaw); }
-            if(keys['KeyA']) { dx -= Math.cos(camYaw+Math.PI/2); dz -= Math.sin(camYaw+Math.PI/2); }
-            if(keys['KeyD']) { dx += Math.cos(camYaw+Math.PI/2); dz += Math.sin(camYaw+Math.PI/2); }
-            if(dx === 0 && dz === 0) { dx = Math.cos(camYaw); dz = Math.sin(camYaw); }
+        
+        // Use keyboard direction if any movement keys are pressed, otherwise look direction
+        let moveX = 0, moveZ = 0;
+        if(keys['KeyW']) { moveX += Math.cos(camYaw); moveZ += Math.sin(camYaw); }
+        if(keys['KeyS']) { moveX -= Math.cos(camYaw); moveZ -= Math.sin(camYaw); }
+        if(keys['KeyA']) { moveX -= Math.cos(camYaw+Math.PI/2); moveZ -= Math.sin(camYaw+Math.PI/2); }
+        if(keys['KeyD']) { moveX += Math.cos(camYaw+Math.PI/2); moveZ += Math.sin(camYaw+Math.PI/2); }
+        
+        // Mobile override
+        if(isMobile && (joyMove.x !== 0 || joyMove.y !== 0)) {
+            moveX = Math.cos(camYaw)*-joyMove.y + Math.cos(camYaw+Math.PI/2)*joyMove.x;
+            moveZ = Math.sin(camYaw)*-joyMove.y + Math.sin(camYaw+Math.PI/2)*joyMove.x;
         }
-        dashDir = [dx, dz];
+
+        if(moveX === 0 && moveZ === 0) { 
+            dx = Math.cos(camYaw); dz = Math.sin(camYaw); 
+        } else {
+            dx = moveX; dz = moveZ;
+        }
+        
+        const mag = Math.sqrt(dx*dx + dz*dz);
+        dashDir = [dx/mag, dz/mag];
     }
 }
 
@@ -263,7 +274,10 @@ function shoot(type) {
     const speed = type === 'punch' ? 4 : 10; 
     const fx = Math.cos(camYaw) * Math.cos(camPitch), fy = Math.sin(camPitch), fz = Math.sin(camYaw) * Math.cos(camPitch);
     const sx = Math.cos(camYaw + Math.PI/2), sz = Math.sin(camYaw + Math.PI/2);
-    const handOffsetRight = 5.0, handOffsetDown = -4.0, handOffsetForward = 8.0; 
+    
+    // PROJECTILES MOVED TO THE RIGHT (8.0 instead of 5.0)
+    const handOffsetRight = 8.0, handOffsetDown = -4.0, handOffsetForward = 8.0; 
+    
     const spawnPos = [
         camPos[0] + (sx * handOffsetRight) + (fx * handOffsetForward),
         camPos[1] + handOffsetDown + (fy * handOffsetForward),
@@ -278,15 +292,15 @@ function shoot(type) {
 function setupJoy(id, target) {
     const el = document.getElementById(id);
     const knob = el.querySelector('.knob');
-    el.addEventListener('touchstart', e => handleJoy(e, el, knob, target));
-    el.addEventListener('touchmove', e => handleJoy(e, el, knob, target));
+    el.addEventListener('touchstart', e => handleJoy(e, el, knob, target), {passive: false});
+    el.addEventListener('touchmove', e => handleJoy(e, el, knob, target), {passive: false});
     el.addEventListener('touchend', () => { target.x = 0; target.y = 0; knob.style.transform = `translate(0,0)`; });
 }
 function handleJoy(e, el, knob, target) {
     e.preventDefault();
     const touch = e.touches[0];
     const rect = el.getBoundingClientRect();
-    const cx = rect.left + 60, cy = rect.top + 60;
+    const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
     let dx = touch.clientX - cx, dy = touch.clientY - cy;
     const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 40);
     const angle = Math.atan2(dy, dx);
@@ -329,7 +343,6 @@ function render() {
     velY -= 0.08;
     let mx = 0, mz = 0;
     
-    // DASH STATE
     if(isDashing) {
         mx = dashDir[0] * 6.0; mz = dashDir[1] * 6.0;
         dashTime -= 0.016; if(dashTime <= 0) isDashing = false;
@@ -412,5 +425,4 @@ function render() {
 }
 requestAnimationFrame(render);
 </script>
-
 </body></html>
